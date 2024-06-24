@@ -149,8 +149,10 @@ def run():
             # Construct the full path of the directory
             dir_path = os.path.join(root, dir_name)
             print(dir_path)
-    pkl_pattern = r'/data/behavior/*.stim.pkl'
-    sync_pattern = r'/data/behavior/*.sync'
+    #pkl_pattern = r'/data/behavior/*.stim.pkl'
+    #sync_pattern = r'/data/behavior/*.sync'
+    pkl_pattern = r'/data/pophys/*.pkl'
+    sync_pattern = r'/data/pophys/*.h5'
     nwb_pattern = r'/results/nwb/*.nwb'
 
     # Find the matching files using glob
