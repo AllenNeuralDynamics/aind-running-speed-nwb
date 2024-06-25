@@ -182,7 +182,7 @@ def run():
 
         num_raw_timestamps = len(frame_times)
         print(num_raw_timestamps)
-        trimmed_times = trim_discontiguous_times(frame_times)
+        trimmed_times = utils.trim_discontiguous_times(frame_times)
         print(len(trimmed_times))
         
 
