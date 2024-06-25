@@ -188,7 +188,7 @@ def run():
 
         dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
         if len(dx_deg) > num_raw_timestamps:
-            dx_deg = dx_deg[:num_raw_timestamps]
+            num_raw_timestamps = len(dx_deg)
 
         if num_raw_timestamps != len(dx_deg):
             raise ValueError(
