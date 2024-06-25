@@ -181,6 +181,10 @@ def run():
 
 
         num_raw_timestamps = len(frame_times)
+        print(num_raw_timestamps)
+        trimmed_times = trim_discontiguous_times(frame_times)
+        print(len(trimmed_times))
+        
 
         dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
 
