@@ -32,6 +32,7 @@ def running_from_stim_file(stim_file, key, expected_length):
     ):
         return stim_file["items"]["foraging"]["encoders"][0][key][:]
     if key in stim_file:
+        print("key in stim file is:", key)
         return stim_file[key][:]
 
     warnings.warn(f"unable to read {key} from this stimulus file")
