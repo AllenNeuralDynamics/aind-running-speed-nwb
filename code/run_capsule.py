@@ -151,8 +151,8 @@ def run():
             print(dir_path)
     #pkl_pattern = r'/data/behavior/*.stim.pkl'
     #sync_pattern = r'/data/behavior/*.sync'
-    pkl_pattern = r'/data/pophys/*.pkl'
-    sync_pattern = r'/data/pophys/*.h5'
+    pkl_pattern = r'/data/ophys/behavior/*.pkl'
+    sync_pattern = r'/data/ophys/*.h5'
     nwb_pattern = r'/results/nwb/*.nwb'
 
     # Find the matching files using glob
