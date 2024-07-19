@@ -151,7 +151,7 @@ def run():
             print(dir_path)
     #pkl_pattern = r'/data/behavior/*.stim.pkl'
     #sync_pattern = r'/data/behavior/*.sync'
-    pkl_pattern = r'/data/ophys/behavior/*.pkl'
+    pkl_pattern = r'/data/behavior/*.pkl'
     sync_pattern = r'/data/ophys/*.h5'
     nwb_pattern = r'/results/nwb/*.nwb'
 
