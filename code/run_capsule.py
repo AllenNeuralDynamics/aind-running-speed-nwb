@@ -68,15 +68,6 @@ def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
         unit=units["velocity"]
     )
 
-    # Create an 'empty' timeseries that only stores end times
-    # An array of nans needs to be created to avoid an nwb schema violation
-    running_speed_end_timeseries = pynwb.base.TimeSeries(
-        name="running_speed_end_times",
-        data=np.full(running_speed["velocity"].shape, np.nan),
-        timestamps=running_speed["end_time"].values,
-        unit=units["velocity"]
-    )
-
     rotation_timeseries = pynwb.base.TimeSeries(
         name="running_wheel_rotation",
         timestamps=running_speed_timeseries,
@@ -85,7 +76,6 @@ def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
     )
 
     running_mod.add_data_interface(running_speed_timeseries)
-    running_mod.add_data_interface(running_speed_end_timeseries)
     running_mod.add_data_interface(rotation_timeseries)
 
     return nwbfile
