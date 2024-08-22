@@ -213,6 +213,7 @@ def run():
     input_nwb = add_raw_running_data_to_nwbfile(input_nwb, raw_data)
     io.write(input_nwb)
     io.close()
+    print("Running speed packaging completed successfully.")
 
 
 if __name__ == "__main__": run()
