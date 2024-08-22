@@ -121,6 +121,53 @@ def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
 
     return nwbfile
 
+def get_running_data(stim_file, sync_dataset):
+    # Why the rising edge? See Sweepstim.update in camstim. This method does:
+    # 1. updates the stimuli
+    # 2. updates the "items", causing a running speed sample to be acquired
+    # 3. sets the vsync line high
+    # 4. flips the buffer
+    frame_times = utils.get_edges(sync_dataset,
+        "rising", ('frames', 'stim_vsync', 'vsync_stim'), units="seconds"
+    )
+
+    num_raw_timestamps = len(frame_times)
+    print(num_raw_timestamps)
+    trimmed_times = utils.trim_discontiguous_times(frame_times)
+    print(len(trimmed_times))
+
+    dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
+    if len(dx_deg) > num_raw_timestamps:
+        num_raw_timestamps = len(dx_deg)
+    if num_raw_timestamps != len(dx_deg):
+        raise ValueError(
+            f"found {num_raw_timestamps} rising edges on the vsync line, "
+            f"but only {len(dx_deg)} rotation samples"
+        )
+
+    vsig = utils.running_from_stim_file(stim_file, "vsig", num_raw_timestamps)
+    vin = utils.running_from_stim_file(stim_file, "vin", num_raw_timestamps)
+    if len(vin) != len(dx_deg):
+        vin = np.concatenate((vin, np.zeros((len(dx_deg) - len(vin)))))
+    if len(vsig) != len(dx_deg):
+        vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
+
+    velocities = extract_running_speeds(
+        frame_times=frame_times,
+        dx_deg=dx_deg,
+        vsig=vsig,
+        vin=vin,
+        wheel_radius=8.255,
+        subject_position=2/3,
+        use_median_duration=True
+    )
+
+    raw_data = pd.DataFrame(
+        {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
+    )
+    return velocities, raw_data
+
+
 def run():
     """ basic run function """
     pkl_paths = list(data_folder.glob(r'ecephys_*/behavior/*.pkl'))
@@ -155,57 +202,7 @@ def run():
         shutil.copyfile(input_nwb_path, result_nwb_path)
     print(f"NWB backend: {NWB_BACKEND}")
 
-
-    # Why the rising edge? See Sweepstim.update in camstim. This method does:
-    # 1. updates the stimuli
-    # 2. updates the "items", causing a running speed sample to be acquired
-    # 3. sets the vsync line high
-    # 4. flips the buffer
-    frame_times = utils.get_edges(sync_dataset,
-        "rising", ('frames', 'stim_vsync', 'vsync_stim'), units="seconds"
-    )
-
-
-    num_raw_timestamps = len(frame_times)
-    print(num_raw_timestamps)
-    trimmed_times = utils.trim_discontiguous_times(frame_times)
-    print(len(trimmed_times))
-        
-
-    dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
-    if len(dx_deg) > num_raw_timestamps:
-        num_raw_timestamps = len(dx_deg)
-
-    if num_raw_timestamps != len(dx_deg):
-        raise ValueError(
-            f"found {num_raw_timestamps} rising edges on the vsync line, "
-            f"but only {len(dx_deg)} rotation samples"
-        )
-
-    vsig = utils.running_from_stim_file(stim_file, "vsig", num_raw_timestamps)
-    vin = utils.running_from_stim_file(stim_file, "vin", num_raw_timestamps)
-
-    if len(vin) != len(dx_deg):
-        vin = np.concatenate((vin, np.zeros((len(dx_deg) - len(vin)))))
-
-    if len(vsig) != len(dx_deg):
-        vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
-
-    velocities = extract_running_speeds(
-        frame_times=frame_times,
-        dx_deg=dx_deg,
-        vsig=vsig,
-        vin=vin,
-        wheel_radius=8.255,
-        subject_position=2/3,
-        use_median_duration=True
-    )
-
-    raw_data = pd.DataFrame(
-        {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
-    )
-
-
+    velocities, raw_data = get_running_data(stim_file, sync_dataset)
 
     io = io_class(str(result_nwb_path), "r+", load_namespaces=True)
     nwb_file = io.read()
