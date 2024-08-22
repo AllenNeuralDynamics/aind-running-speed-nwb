@@ -134,9 +134,8 @@ def run():
     base_dir = '/data'
 
     #pkl_pattern = r'/data/behavior/*.stim.pkl'
-    #sync_pattern = r'/data/behavior/*.sync'
-    pkl_pattern = r'/data/behavior/*.pkl'
-    sync_pattern = r'/data/ophys/*.h5'
+    sync_pattern = r'/data/ecephys_*/behavior/*.sync'
+    pkl_pattern = r'/data/ecephys_*/behavior/*.pkl'
     nwb_pattern = r'/results/nwb/*.nwb'
 
     # Find the matching files using glob
@@ -147,70 +146,73 @@ def run():
 
     print(pkl_files, sync_files, nwb_files)
     # Ensure there's exactly one match for each (or handle as needed)
-    if len(pkl_files) == 1 and len(sync_files) == 1 and len(nwb_files) == 1:
-        pkl_file = pkl_files[0]
-        sync_file = sync_files[0]
-        nwb_file = nwb_files[0]
-        stim_file = pd.read_pickle(pkl_file)
-        sync_dataset = utils.load_sync(sync_file)
+    if not (len(pkl_files) == 1 and len(sync_files) == 1 and len(nwb_files) == 1):
+        print("Error: Expected exactly one file match for each pattern.")
+        print(f'Found {len(pkl_files)} pkl files, {len(sync_files)} sync files, {len(nwb_files)} nwb files')
+        print('Skipping adding running data')
+        return
 
-        # Why the rising edge? See Sweepstim.update in camstim. This method does:
-        # 1. updates the stimuli
-        # 2. updates the "items", causing a running speed sample to be acquired
-        # 3. sets the vsync line high
-        # 4. flips the buffer
-        frame_times = utils.get_edges(sync_dataset,
-            "rising", ('frames', 'stim_vsync', 'vsync_stim'), units="seconds"
-        )
+    pkl_file = pkl_files[0]
+    sync_file = sync_files[0]
+    nwb_file = nwb_files[0]
+    stim_file = pd.read_pickle(pkl_file)
+    sync_dataset = utils.load_sync(sync_file)
+
+    # Why the rising edge? See Sweepstim.update in camstim. This method does:
+    # 1. updates the stimuli
+    # 2. updates the "items", causing a running speed sample to be acquired
+    # 3. sets the vsync line high
+    # 4. flips the buffer
+    frame_times = utils.get_edges(sync_dataset,
+        "rising", ('frames', 'stim_vsync', 'vsync_stim'), units="seconds"
+    )
 
 
-        num_raw_timestamps = len(frame_times)
-        print(num_raw_timestamps)
-        trimmed_times = utils.trim_discontiguous_times(frame_times)
-        print(len(trimmed_times))
+    num_raw_timestamps = len(frame_times)
+    print(num_raw_timestamps)
+    trimmed_times = utils.trim_discontiguous_times(frame_times)
+    print(len(trimmed_times))
         
 
-        dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
-        if len(dx_deg) > num_raw_timestamps:
-            num_raw_timestamps = len(dx_deg)
+    dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
+    if len(dx_deg) > num_raw_timestamps:
+        num_raw_timestamps = len(dx_deg)
 
-        if num_raw_timestamps != len(dx_deg):
-            raise ValueError(
-                f"found {num_raw_timestamps} rising edges on the vsync line, "
-                f"but only {len(dx_deg)} rotation samples"
-            )
-
-        vsig = utils.running_from_stim_file(stim_file, "vsig", num_raw_timestamps)
-        vin = utils.running_from_stim_file(stim_file, "vin", num_raw_timestamps)
-
-        if len(vin) != len(dx_deg):
-            vin = np.concatenate((vin, np.zeros((len(dx_deg) - len(vin)))))
-
-        if len(vsig) != len(dx_deg):
-            vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
-
-        velocities = extract_running_speeds(
-            frame_times=frame_times,
-            dx_deg=dx_deg,
-            vsig=vsig,
-            vin=vin,
-            wheel_radius=8.255,
-            subject_position=2/3,
-            use_median_duration=True
+    if num_raw_timestamps != len(dx_deg):
+        raise ValueError(
+            f"found {num_raw_timestamps} rising edges on the vsync line, "
+            f"but only {len(dx_deg)} rotation samples"
         )
 
-        raw_data = pd.DataFrame(
-            {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
-        )
-        print(raw_data)
-        print(velocities)
+    vsig = utils.running_from_stim_file(stim_file, "vsig", num_raw_timestamps)
+    vin = utils.running_from_stim_file(stim_file, "vin", num_raw_timestamps)
 
-        io = NWBZarrIO(nwb_file, "r+", load_namespaces=True)
-        input_nwb = io.read()
-        input_nwb = add_running_speed_to_nwbfile(input_nwb, velocities)
-        input_nwb = add_raw_running_data_to_nwbfile(input_nwb, raw_data)
-        io.write(input_nwb)
-        io.close()
-    
+    if len(vin) != len(dx_deg):
+        vin = np.concatenate((vin, np.zeros((len(dx_deg) - len(vin)))))
+
+    if len(vsig) != len(dx_deg):
+        vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
+
+    velocities = extract_running_speeds(
+        frame_times=frame_times,
+        dx_deg=dx_deg,
+        vsig=vsig,
+        vin=vin,
+        wheel_radius=8.255,
+        subject_position=2/3,
+        use_median_duration=True
+    )
+
+    raw_data = pd.DataFrame(
+        {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
+    )
+
+    io = NWBZarrIO(nwb_file, "r+", load_namespaces=True)
+    input_nwb = io.read()
+    input_nwb = add_running_speed_to_nwbfile(input_nwb, velocities)
+    input_nwb = add_raw_running_data_to_nwbfile(input_nwb, raw_data)
+    io.write(input_nwb)
+    io.close()
+
 
 if __name__ == "__main__": run()
