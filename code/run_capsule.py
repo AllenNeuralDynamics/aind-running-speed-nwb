@@ -8,7 +8,16 @@ import glob
 
 import os
 import shutil
+
+from pathlib import Path
 from hdmf_zarr import NWBZarrIO
+from pynwb import NWBHDF5IO
+
+
+data_folder = Path("../data/")
+scratch_folder = Path("../scratch/")
+results_folder = Path("../results/")
+
 
 DEFAULT_RUNNING_SPEED_UNITS = {
     "velocity": "cm/s",
@@ -114,49 +123,38 @@ def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
 
 def run():
     """ basic run function """
-    # Define the source pattern and destination path
-    source_pattern = r'/data/nwb/*.nwb'  # Adjust this pattern as needed
-    destination_dir = '/results/nwb/'
+    pkl_paths = list(data_folder.glob(r'ecephys_*/behavior/*.pkl'))
+    sync_paths = list(data_folder.glob(r'ecephys_*/behavior/*.sync'))
+    input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
 
-    # Create the destination directory if it doesn't exist
-    os.makedirs(destination_dir, exist_ok=True)
-
-    # Find all directories matching the source pattern
-    source_paths = glob.glob(source_pattern)
-
-    # Copy each matching directory to the destination directory
-    for source_path in source_paths:
-        destination_path = os.path.join(destination_dir, os.path.basename(source_path))
-        print(source_path, destination_path)
-        shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
-
-    # Specify the directory you want to search
-    base_dir = '/data'
-
-    #pkl_pattern = r'/data/behavior/*.stim.pkl'
-    sync_pattern = r'/data/ecephys_*/behavior/*.sync'
-    pkl_pattern = r'/data/ecephys_*/behavior/*.pkl'
-    nwb_pattern = r'/results/nwb/*.nwb'
-
-    # Find the matching files using glob
-    pkl_files = glob.glob(pkl_pattern)
-    sync_files = glob.glob(sync_pattern)
-    nwb_files = glob.glob(nwb_pattern)
-
-
-    print(pkl_files, sync_files, nwb_files)
     # Ensure there's exactly one match for each (or handle as needed)
-    if not (len(pkl_files) == 1 and len(sync_files) == 1 and len(nwb_files) == 1):
+    if not (len(pkl_paths) == 1 and len(sync_paths) == 1 and len(input_nwb_paths) == 1):
         print("Error: Expected exactly one file match for each pattern.")
         print(f'Found {len(pkl_files)} pkl files, {len(sync_files)} sync files, {len(nwb_files)} nwb files')
+        print(pkl_paths, sync_paths, input_nwb_paths)
         print('Skipping adding running data')
         return
 
-    pkl_file = pkl_files[0]
-    sync_file = sync_files[0]
-    nwb_file = nwb_files[0]
-    stim_file = pd.read_pickle(pkl_file)
-    sync_dataset = utils.load_sync(sync_file)
+    pkl_path = pkl_paths[0]
+    sync_path = sync_paths[0]
+    input_nwb_path = input_nwb_paths[0]
+    print(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {input_nwb_path}")
+    stim_file = pd.read_pickle(str(pkl_path))
+    sync_dataset = utils.load_sync(str(sync_path))
+
+    # determine if file is zarr or hdf5, and copy it to results
+    result_nwb_path = results_folder / input_nwb_path.name
+    if input_nwb_path.is_dir():
+        assert (input_nwb_path / ".zattrs").is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
+        NWB_BACKEND = "zarr"
+        io_class = NWBZarrIO
+        shutil.copytree(input_nwb_path, result_nwb_path, dirs_exist_ok=True)
+    else:
+        NWB_BACKEND = "hdf5"
+        io_class = NWBHDF5IO
+        shutil.copyfile(input_nwb_path, result_nwb_path)
+    print(f"NWB backend: {NWB_BACKEND}")
+
 
     # Why the rising edge? See Sweepstim.update in camstim. This method does:
     # 1. updates the stimuli
@@ -207,11 +205,13 @@ def run():
         {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
     )
 
-    io = NWBZarrIO(nwb_file, "r+", load_namespaces=True)
-    input_nwb = io.read()
-    input_nwb = add_running_speed_to_nwbfile(input_nwb, velocities)
-    input_nwb = add_raw_running_data_to_nwbfile(input_nwb, raw_data)
-    io.write(input_nwb)
+
+
+    io = io_class(str(result_nwb_path), "r+", load_namespaces=True)
+    nwb_file = io.read()
+    nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
+    nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
+    io.write(nwb_file)
     io.close()
     print("Running speed packaging completed successfully.")
 
