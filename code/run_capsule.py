@@ -133,12 +133,6 @@ def run():
     # Specify the directory you want to search
     base_dir = '/data'
 
-    # Walk through the directory
-    for root, dirs, files in os.walk(base_dir):
-        for dir_name in dirs:
-            # Construct the full path of the directory
-            dir_path = os.path.join(root, dir_name)
-            print(dir_path)
     #pkl_pattern = r'/data/behavior/*.stim.pkl'
     #sync_pattern = r'/data/behavior/*.sync'
     pkl_pattern = r'/data/behavior/*.pkl'
