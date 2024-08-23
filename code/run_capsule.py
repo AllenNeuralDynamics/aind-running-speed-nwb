@@ -177,7 +177,7 @@ def run():
     # Ensure there's exactly one match for each (or handle as needed)
     if not (len(pkl_paths) == 1 and len(sync_paths) == 1 and len(input_nwb_paths) == 1):
         print("Error: Expected exactly one file match for each pattern.")
-        print(f'Found {len(pkl_files)} pkl files, {len(sync_files)} sync files, {len(nwb_files)} nwb files')
+        print(f'Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files, {len(input_nwb_paths)} nwb files')
         print(pkl_paths, sync_paths, input_nwb_paths)
         print('Skipping adding running data')
         return
