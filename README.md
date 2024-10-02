@@ -1,3 +1,3 @@
-# aind-capsule-template
+# NWB-Running-Packaging-Running-Speed
 
-Basic structure of a capsule to be customized as needed.
+Used to append Running Speed info to an NWB file. Appends both raw running info and processed run info into the nwb files in acquisition and processed fields respectively. Simply attach a subject nwb and the ophys or ephys raw asset to use in pipeline mode
