@@ -174,18 +174,15 @@ def run():
     sync_paths = list(data_folder.glob(r'ecephys_*/behavior/*.sync'))
     input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
 
-    # Print everything in the data folder
-    for item in data_folder.glob('*'):
-        print(item)
     # Ensure there's exactly one match for each (or handle as needed)
-    if not (len(pkl_paths) == 1 and len(sync_paths) == 1 and len(input_nwb_paths) == 1):
-        print("Error: Expected exactly one file match for each pattern.")
-        print(f'Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files, {len(input_nwb_paths)} nwb files')
-        print(pkl_paths, sync_paths, input_nwb_paths)
-        print('trying ophys paths')
+    if len(input_nwb_paths) != 1:
+        raise Exception(f'Found {len(input_nwb_paths)} nwb files, expected 1: {input_nwb_paths}')
+    if len(pkl_paths) != 1 or len(sync_paths) != 1:
+        print("Didn't find expected files in ecephys directories, trying ophys paths")
         pkl_paths = list(data_folder.glob(r'behavior/*.pkl'))
         sync_paths = list(data_folder.glob(r'pophys/*_sync.h5'))
-    
+    if len(pkl_paths) == 0 or len(sync_paths) == 0:
+        raise Exception(f'Expected exactly one file match for each pattern. Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files; {pkl_paths}, {sync_paths}')
 
     pkl_path = pkl_paths[0]
     sync_path = sync_paths[0]
