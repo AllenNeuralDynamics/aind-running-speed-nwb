@@ -180,7 +180,7 @@ def run():
     if len(pkl_paths) != 1 or len(sync_paths) != 1:
         print("Didn't find expected files in ecephys directories, trying ophys paths")
         pkl_paths = list(data_folder.glob(r'behavior/*.pkl'))
-        sync_paths = list(data_folder.glob(r'pophys/*_sync.h5'))
+        sync_paths = list(data_folder.glob(r'pophys/*.h5'))
     if len(pkl_paths) == 0 or len(sync_paths) == 0:
         raise Exception(f'Expected exactly one file match for each pattern. Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files; {pkl_paths}, {sync_paths}')
 
