@@ -187,10 +187,10 @@ def run():
     if len(pkl_paths) != 1 or len(sync_paths) != 1:
         print("Didn't find expected files in ecephys directories, trying ophys paths")
         pkl_paths = list(data_folder.glob(r'multiplane-ophys_*/behavior/*.pkl'))
-        sync_paths = list(data_folder.glob(r'multiplane-ophys_*/pophys/*.h5'))
-    if len(sync_paths) != 1:
-        print("Didn't find sync in pophys, trying behavior folder")
         sync_paths = list(data_folder.glob(r'multiplane-ophys_*/behavior/*.h5'))
+    if len(sync_paths) != 1:
+        print("Didn't find sync in behavior, trying pophys folder")
+        sync_paths = list(data_folder.glob(r'multiplane-ophys_*/pophys/*.h5'))
 
     if len(pkl_paths) == 0 or len(sync_paths) == 0:
         raise Exception(f'Expected exactly one file match for each pattern. Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files; {pkl_paths}, {sync_paths}')
