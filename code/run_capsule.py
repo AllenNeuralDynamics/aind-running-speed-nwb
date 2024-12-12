@@ -54,11 +54,18 @@ def extract_running_speeds(
             "net_rotation": dx_rad,
         }
     )
+    sudden_drop = (
+        (abs(df["velocity"].shift(1)) > 0.5)  # Previous velocity is significantly non-zero
+        & np.isclose(df["velocity"], 0.0, atol=1e-3)  # Current velocity is near zero
+        & (abs(df["velocity"].shift(-1)) > 0.5)  # Following velocity is significantly non-zero
+    )
 
+    # Remove rows with near-zero velocity only if they are flanked by significant non-zero values
+    df = df[~sudden_drop]
     # due to an acquisition bug (the buffer of raw orientations may be updated
     # more slowly than it is read, leading to a 0 value for the change in
     # orientation over an interval) there may be exact zeros in the velocity.
-    df = df[~(np.isclose(df["net_rotation"], 0.0))]
+    #df = df[~(np.isclose(df["net_rotation"], 0.0))]
 
     return df
 
@@ -67,18 +74,18 @@ def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
     if units is None:
         units = DEFAULT_RUNNING_SPEED_UNITS
 
-    running_mod = pynwb.ProcessingModule("running", "running speed data")
+    running_mod = pynwb.ProcessingModule("running_new", "running speed data")
     nwbfile.add_processing_module(running_mod)
 
     running_speed_timeseries = pynwb.base.TimeSeries(
-        name="running_speed",
+        name="running_speed_new",
         timestamps=running_speed["start_time"].values,
         data=running_speed["velocity"].values,
         unit=units["velocity"]
     )
 
     rotation_timeseries = pynwb.base.TimeSeries(
-        name="running_wheel_rotation",
+        name="running_wheel_rotation_new",
         timestamps=running_speed_timeseries,
         data=running_speed["net_rotation"].values,
         unit=units["rotation"]
@@ -95,21 +102,21 @@ def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
         units = DEFAULT_RUNNING_SPEED_UNITS
 
     raw_rotation_timeseries = pynwb.base.TimeSeries(
-        name="raw_running_wheel_rotation",
+        name="raw_running_wheel_rotation_new",
         timestamps=np.array(raw_running_data["frame_time"]),
         data=raw_running_data["dx"].values,
         unit=units["rotation"]
     )
 
     vsig_ts = pynwb.base.TimeSeries(
-        name="running_wheel_signal_voltage",
+        name="running_wheel_signal_voltage_new",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vsig"].values,
         unit=units["vsig"]
     )
 
     vin_ts = pynwb.base.TimeSeries(
-        name="running_wheel_supply_voltage",
+        name="running_wheel_supply_voltage_new",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vin"].values,
         unit=units["vin"]
@@ -179,8 +186,12 @@ def run():
         raise Exception(f'Found {len(input_nwb_paths)} nwb files, expected 1: {input_nwb_paths}')
     if len(pkl_paths) != 1 or len(sync_paths) != 1:
         print("Didn't find expected files in ecephys directories, trying ophys paths")
-        pkl_paths = list(data_folder.glob(r'behavior/*.pkl'))
-        sync_paths = list(data_folder.glob(r'pophys/*.h5'))
+        pkl_paths = list(data_folder.glob(r'multiplane-ophys_*/behavior/*.pkl'))
+        sync_paths = list(data_folder.glob(r'multiplane-ophys_*/pophys/*.h5'))
+    if len(sync_paths) != 1:
+        print("Didn't find sync in pophys, trying behavior folder")
+        sync_paths = list(data_folder.glob(r'multiplane-ophys_*/behavior/*.h5'))
+
     if len(pkl_paths) == 0 or len(sync_paths) == 0:
         raise Exception(f'Expected exactly one file match for each pattern. Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files; {pkl_paths}, {sync_paths}')
 
