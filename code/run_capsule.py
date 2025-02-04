@@ -217,7 +217,7 @@ def run():
 
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
 
-    io = io_class(str(result_nwb_path), "r+", load_namespaces=True)
+    io = io_class(str(result_nwb_path), "r+")
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
     nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
