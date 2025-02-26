@@ -1,4 +1,4 @@
-# hash:sha256:5b8f056a7af7f803b8aeafbe9d15e872fec9c67e35e222dea88686bcc8ef54c2
+# hash:sha256:4bf7050422418093056badbd1b9770f98aa6eca0f1182739ca221a172b1668f1
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -10,7 +10,7 @@ COPY git-askpass /
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        vim \
+        vim=2:8.1.2269-1ubuntu5.31 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
