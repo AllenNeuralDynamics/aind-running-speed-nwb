@@ -1,13 +1,9 @@
-import h5py
-import datetime
+from pathlib import Path
+from typing import List, Optional, Sequence, Tuple, Union
 
+import h5py
 import numpy as np
 import pandas as pd
-import scipy.spatial.distance as distance
-
-from typing import TYPE_CHECKING, Any, Union, Sequence, Optional, Union, Tuple, List
-from pathlib import Path
-
 
 DEGREES_TO_RADIANS = np.pi / 180.0
 
@@ -24,11 +20,11 @@ def check_encoder(parent, key):
 
 def running_from_stim_file(stim_file, key, expected_length):
     if "behavior" in stim_file["items"] and check_encoder(
-            stim_file["items"]["behavior"], key
+        stim_file["items"]["behavior"], key
     ):
         return stim_file["items"]["behavior"]["encoders"][0][key][:]
     if "foraging" in stim_file["items"] and check_encoder(
-            stim_file["items"]["foraging"], key
+        stim_file["items"]["foraging"], key
     ):
         return stim_file["items"]["foraging"]["encoders"][0][key][:]
     if key in stim_file:
@@ -57,8 +53,7 @@ def load_sync(path):
         Path to hdf5 file.
 
     """
-    dfile = h5py.File(
-        path, 'r')
+    dfile = h5py.File(path, "r")
     return dfile
 
 
@@ -67,9 +62,9 @@ def get_edges(
     kind: str,
     keys: Union[str, Sequence[str]],
     units: str = "seconds",
-    permissive: bool = False
+    permissive: bool = False,
 ) -> Optional[np.ndarray]:
-    """ Utility function for extracting edge times from a line
+    """Utility function for extracting edge times from a line
 
     Parameters
     ----------
@@ -102,23 +97,27 @@ def get_edges(
 
     for line in keys:
         try:
-            if kind == 'falling':
+            if kind == "falling":
                 return get_falling_edges(sync_file, line, units)
-            elif kind == 'rising':
-                return  get_rising_edges(sync_file, line, units)
-            elif kind == 'all':
-                return np.sort(np.concatenate([
-                    get_edges(sync_file,'rising', keys, units),
-                    get_edges(sync_file, 'falling', keys, units)
-                ]))
+            elif kind == "rising":
+                return get_rising_edges(sync_file, line, units)
+            elif kind == "all":
+                return np.sort(
+                    np.concatenate(
+                        [
+                            get_edges(sync_file, "rising", keys, units),
+                            get_edges(sync_file, "falling", keys, units),
+                        ]
+                    )
+                )
         except ValueError:
             continue
 
     if not permissive:
-        raise KeyError(
-            f"none of {keys} were found in this dataset's line labels")
+        raise KeyError(f"none of {keys} were found in this dataset's line labels")
 
-def get_rising_edges(sync_file, line, units='samples'):
+
+def get_rising_edges(sync_file, line, units="samples"):
     """
     Returns the counter values for the rizing edges for a specific bit or
         line.
@@ -129,10 +128,11 @@ def get_rising_edges(sync_file, line, units='samples'):
         Line for which to return edges.
 
     """
-    meta_data  = get_meta_data(sync_file)
+    meta_data = get_meta_data(sync_file)
     bit = line_to_bit(sync_file, line)
     changes = get_bit_changes(sync_file, bit)
     return get_all_times(sync_file, meta_data, units)[np.where(changes == 1)]
+
 
 def trim_discontiguous_times(times: np.ndarray, threshold=100) -> np.ndarray:
     """
@@ -163,14 +163,15 @@ def trim_discontiguous_times(times: np.ndarray, threshold=100) -> np.ndarray:
     if len(gap_indices) == 0:
         return times
 
-    return times[:gap_indices[0] + 1]
+    return times[: gap_indices[0] + 1]
 
 
-def get_synchronized_frame_times(session_sync_file: Path,
-                                 sync_line_label_keys: Tuple[str, ...],
-                                 drop_frames: Optional[List[int]] = None,
-                                 trim_after_spike: bool = True,
-                                 ) -> pd.Series:
+def get_synchronized_frame_times(
+    session_sync_file: Path,
+    sync_line_label_keys: Tuple[str, ...],
+    drop_frames: Optional[List[int]] = None,
+    trim_after_spike: bool = True,
+) -> pd.Series:
     """Get experimental frame times from an experiment session sync file.
 
     1. Get rising edges from the sync dataset
@@ -202,9 +203,7 @@ def get_synchronized_frame_times(session_sync_file: Path,
     pd.Series
         An array of times when eye tracking frames were acquired.
     """
-    times = get_edges(
-      session_sync_file,  "rising", sync_line_label_keys, units="seconds"
-    )
+    times = get_edges(session_sync_file, "rising", sync_line_label_keys, units="seconds")
 
     times = trim_discontiguous_times(times) if trim_after_spike else times
     if drop_frames is not None:
@@ -218,8 +217,9 @@ def get_meta_data(sync_file):
     Returns the metadata for the sync file.
 
     """
-    meta_data = eval(sync_file['meta'][()])
+    meta_data = eval(sync_file["meta"][()])
     return meta_data
+
 
 def line_to_bit(sync_file, line):
     """
@@ -248,8 +248,9 @@ def get_line_labels(sync_file):
 
     """
     meta_data = get_meta_data(sync_file)
-    line_labels = meta_data['line_labels']
+    line_labels = meta_data["line_labels"]
     return line_labels
+
 
 def get_bit_changes(sync_file, bit):
     """
@@ -265,8 +266,10 @@ def get_bit_changes(sync_file, bit):
     bit_array = get_sync_file_bit(sync_file, bit)
     return np.ediff1d(bit_array, to_begin=0)
 
+
 def get_sync_file_bit(sync_file, bit):
     return get_bit(get_all_bits(sync_file), bit)
+
 
 def get_bit(uint_array, bit):
     """
@@ -280,17 +283,18 @@ def get_bit(uint_array, bit):
         The bit to extract.
 
     """
-    return np.bitwise_and(uint_array, 2 ** bit).astype(bool).astype(np.uint8)
+    return np.bitwise_and(uint_array, 2**bit).astype(bool).astype(np.uint8)
+
 
 def get_all_bits(sync_file):
     """
     Returns the data for all bits.
 
     """
-    return sync_file['data'][()][:, -1]
+    return sync_file["data"][()][:, -1]
 
 
-def get_all_times(sync_file, meta_data, units='samples'):
+def get_all_times(sync_file, meta_data, units="samples"):
     """
     Returns all counter values.
 
@@ -300,23 +304,22 @@ def get_all_times(sync_file, meta_data, units='samples'):
         Return times in 'samples' or 'seconds'
 
     """
-    if meta_data['ni_daq']['counter_bits'] == 32:
-        times = sync_file['data'][()][:, 0]
+    if meta_data["ni_daq"]["counter_bits"] == 32:
+        times = sync_file["data"][()][:, 0]
     else:
         times = times
     units = units.lower()
-    if units == 'samples':
+    if units == "samples":
         return times
-    elif units in ['seconds', 'sec', 'secs']:
+    elif units in ["seconds", "sec", "secs"]:
         freq = get_sample_freq(meta_data)
         return times / freq
     else:
         raise ValueError("Only 'samples' or 'seconds' are valid units.")
 
+
 def get_sample_freq(meta_data):
     try:
-        return float(meta_data['ni_daq']['sample_freq'])
+        return float(meta_data["ni_daq"]["sample_freq"])
     except KeyError:
-        return float(meta_data['ni_daq']['counter_output_freq'])
-
-
+        return float(meta_data["ni_daq"]["counter_output_freq"])
