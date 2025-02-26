@@ -128,7 +128,7 @@ def add_running_speed_to_nwbfile(
 
 
 def add_raw_running_data_to_nwbfile(
-    nwbfile: Union[NWBHDF5IO | NWBZarrIO], raw_running_data: dict, units: dict = None
+    nwbfile: Union[NWBHDF5IO, NWBZarrIO], raw_running_data: dict, units: dict = None
 ):
     """Add raw running data to an NWB file
 
