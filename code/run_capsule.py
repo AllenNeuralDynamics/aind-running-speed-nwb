@@ -1,35 +1,54 @@
-""" top level run script """
+"""top level run script"""
 
-import utils
-import pandas as pd
-import numpy as np 
-import pynwb
-import glob
-
-import os
+import argparse
+import logging
 import shutil
-
 from pathlib import Path
+from typing import Union
+
+import numpy as np
+import pandas as pd
+import pynwb
+import utils
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
-
-
-data_folder = Path("../data/")
-scratch_folder = Path("../scratch/")
-results_folder = Path("../results/")
-
 
 DEFAULT_RUNNING_SPEED_UNITS = {
     "velocity": "cm/s",
     "vin": "V",
     "vsig": "V",
-    "rotation": "radians"
+    "rotation": "radians",
 }
 
+
 def extract_running_speeds(
-        frame_times, dx_deg, vsig, vin, wheel_radius, subject_position,
-        use_median_duration=False
-):
+    frame_times: np.array,
+    dx_deg: np.array,
+    wheel_radius: float,
+    subject_position: float,
+    use_median_duration: bool = False,
+) -> pd.DataFrame:
+    """Extract running speeds from raw running wheel data
+
+    Parameters
+    ----------
+    frame_times : np.array
+        frame times from the sync dataset
+    dx_deg : np.array
+        change in orientation of the running wheel in degrees
+    wheel_radius : float
+        radius of the running wheel
+    subject_position : float
+        position of the subject on the running wheel
+    use_median_duration : bool, optional
+        normalize velocity to median, by default False
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing the start and end times of each interval, the
+        velocity of the running wheel, and the net rotation of the wheel
+    """
     # the first interval does not have a known start time, so we can't compute
     # an average velocity from dx
     dx_rad = utils.degrees_to_radians(dx_deg[1:])
@@ -63,7 +82,25 @@ def extract_running_speeds(
     return df
 
 
-def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
+def add_running_speed_to_nwbfile(
+    nwbfile: Union[NWBZarrIO, NWBHDF5IO], running_speed: np.array, units: dict = None
+):
+    """Add running speed data to an NWB file
+
+    Parameters
+    ----------
+    nwbfile : NWBFile
+        NWB file to add running speed data to
+    running_speed : pd.DataFrame
+        DataFrame containing running speed data
+    units : dict, optional
+        units for the running speed data, by default None
+
+    Returns
+    -------
+    NWBFile
+        NWB file with running speed data added
+    """
     if units is None:
         units = DEFAULT_RUNNING_SPEED_UNITS
 
@@ -74,14 +111,14 @@ def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
         name="running_speed",
         timestamps=running_speed["start_time"].values,
         data=running_speed["velocity"].values,
-        unit=units["velocity"]
+        unit=units["velocity"],
     )
 
     rotation_timeseries = pynwb.base.TimeSeries(
         name="running_wheel_rotation",
         timestamps=running_speed_timeseries,
         data=running_speed["net_rotation"].values,
-        unit=units["rotation"]
+        unit=units["rotation"],
     )
 
     running_mod.add_data_interface(running_speed_timeseries)
@@ -90,7 +127,24 @@ def add_running_speed_to_nwbfile(nwbfile, running_speed, units=None):
     return nwbfile
 
 
-def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
+def add_raw_running_data_to_nwbfile(
+    nwbfile: Union[NWBHDF5IO | NWBZarrIO], raw_running_data: dict, units: dict = None
+):
+    """Add raw running data to an NWB file
+
+    Parameters
+    ----------
+    nwbfile : NWBFile
+        NWB file to add running speed data to
+    raw_running_data : dict
+        dictionary containing raw running data
+    units : dict, optional
+
+    Returns
+    -------
+    NWBFile
+        NWB file with raw running data added
+    """
     if units is None:
         units = DEFAULT_RUNNING_SPEED_UNITS
 
@@ -98,21 +152,21 @@ def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
         name="raw_running_wheel_rotation",
         timestamps=np.array(raw_running_data["frame_time"]),
         data=raw_running_data["dx"].values,
-        unit=units["rotation"]
+        unit=units["rotation"],
     )
 
     vsig_ts = pynwb.base.TimeSeries(
         name="running_wheel_signal_voltage",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vsig"].values,
-        unit=units["vsig"]
+        unit=units["vsig"],
     )
 
     vin_ts = pynwb.base.TimeSeries(
         name="running_wheel_supply_voltage",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vin"].values,
-        unit=units["vin"]
+        unit=units["vin"],
     )
 
     nwbfile.add_acquisition(raw_rotation_timeseries)
@@ -121,20 +175,37 @@ def add_raw_running_data_to_nwbfile(nwbfile, raw_running_data, units=None):
 
     return nwbfile
 
-def get_running_data(stim_file, sync_dataset):
+
+def get_running_data(
+    stim_file: Union[Path, str], sync_dataset: pd.DataFrame
+) -> pd.DataFrame:
+    """Get running data from a stimulus file and sync dataset
+
+    Parameters
+    ----------
+    stim_file : Union[Path, str]
+        path to the stimulus file
+    sync_dataset : pd.DataFrame
+        sync dataset
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing running speeds
+    """
     # Why the rising edge? See Sweepstim.update in camstim. This method does:
     # 1. updates the stimuli
     # 2. updates the "items", causing a running speed sample to be acquired
     # 3. sets the vsync line high
     # 4. flips the buffer
-    frame_times = utils.get_edges(sync_dataset,
-        "rising", ('frames', 'stim_vsync', 'vsync_stim'), units="seconds"
+    frame_times = utils.get_edges(
+        sync_dataset, "rising", ("frames", "stim_vsync", "vsync_stim"), units="seconds"
     )
 
     num_raw_timestamps = len(frame_times)
-    print(num_raw_timestamps)
+    logging.info(num_raw_timestamps)
     trimmed_times = utils.trim_discontiguous_times(frame_times)
-    print(len(trimmed_times))
+    logging.info(len(trimmed_times))
 
     dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
     if len(dx_deg) > num_raw_timestamps:
@@ -155,11 +226,9 @@ def get_running_data(stim_file, sync_dataset):
     velocities = extract_running_speeds(
         frame_times=frame_times,
         dx_deg=dx_deg,
-        vsig=vsig,
-        vin=vin,
         wheel_radius=8.255,
-        subject_position=2/3,
-        use_median_duration=True
+        subject_position=2 / 3,
+        use_median_duration=True,
     )
 
     raw_data = pd.DataFrame(
@@ -168,41 +237,55 @@ def get_running_data(stim_file, sync_dataset):
     return velocities, raw_data
 
 
+def parse_args():
+    """Get command line arguments
+
+    Returns:
+        argparse.Namespace: command line arguments
+    """
+
+    parser = argparse.ArgumentParser(
+        description="Package running speed data into an NWB file"
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=str,
+        help="Path to the folder containing the data",
+        default="../data",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Path to the folder to store results",
+        default="../results",
+    )
+    return parser.parse_args()
+
+
 def run():
-    """ basic run function """
-    pkl_paths = list(data_folder.glob(r'ecephys_*/behavior/*.pkl'))
-    sync_paths = list(data_folder.glob(r'ecephys_*/behavior/*.sync'))
-    input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
+    """basic run function"""
+    args = parse_args()
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+    pkl_path = next(input_dir.rglob("behavior/*.pkl"))
+    sync_path = next(input_dir.rglob("behavior/*.h5"))
+    nwb_path = next(input_dir.rglob("*.nwb"))
 
-    # Ensure there's exactly one match for each (or handle as needed)
-    if len(input_nwb_paths) != 1:
-        raise Exception(f'Found {len(input_nwb_paths)} nwb files, expected 1: {input_nwb_paths}')
-    if len(pkl_paths) != 1 or len(sync_paths) != 1:
-        print("Didn't find expected files in ecephys directories, trying ophys paths")
-        pkl_paths = list(data_folder.glob(r'behavior/*.pkl'))
-        sync_paths = list(data_folder.glob(r'pophys/*.h5'))
-    if len(pkl_paths) == 0 or len(sync_paths) == 0:
-        raise Exception(f'Expected exactly one file match for each pattern. Found {len(pkl_paths)} pkl files, {len(sync_paths)} sync files; {pkl_paths}, {sync_paths}')
-
-    pkl_path = pkl_paths[0]
-    sync_path = sync_paths[0]
-    input_nwb_path = input_nwb_paths[0]
-    print(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {input_nwb_path}")
+    logging.info(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}")
     stim_file = pd.read_pickle(str(pkl_path))
     sync_dataset = utils.load_sync(str(sync_path))
 
     # determine if file is zarr or hdf5, and copy it to results
-    result_nwb_path = results_folder / input_nwb_path.name
-    if input_nwb_path.is_dir():
-        assert (input_nwb_path / ".zattrs").is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
-        NWB_BACKEND = "zarr"
+    result_nwb_path = output_dir / nwb_path.name
+    if nwb_path.is_dir():
+        assert (
+            nwb_path / ".zattrs"
+        ).is_file(), f"{nwb_path.name} is not a valid Zarr folder"
         io_class = NWBZarrIO
-        shutil.copytree(input_nwb_path, result_nwb_path, dirs_exist_ok=True)
+        shutil.copytree(nwb_path, result_nwb_path, dirs_exist_ok=True)
     else:
-        NWB_BACKEND = "hdf5"
         io_class = NWBHDF5IO
-        shutil.copyfile(input_nwb_path, result_nwb_path)
-    print(f"NWB backend: {NWB_BACKEND}")
+        shutil.copyfile(nwb_path, result_nwb_path)
 
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
 
@@ -212,7 +295,8 @@ def run():
     nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
     io.write(nwb_file)
     io.close()
-    print("Running speed packaging completed successfully.")
+    logging.info("Running speed packaging completed successfully.")
 
 
-if __name__ == "__main__": run()
+if __name__ == "__main__":
+    run()
