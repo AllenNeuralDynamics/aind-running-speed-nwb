@@ -12,6 +12,7 @@ import pynwb
 import utils
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
+from sync_dataset import Sync
 
 DEFAULT_RUNNING_SPEED_UNITS = {
     "velocity": "cm/s",
@@ -184,7 +185,7 @@ def add_raw_running_data_to_nwbfile(
 
 
 def get_running_data(
-    stim_file: Union[Path, str], sync_dataset: pd.DataFrame
+    stim_file: Union[Path, str], sync_dataset: Sync
 ) -> pd.DataFrame:
     """Get running data from a stimulus file and sync dataset
 
@@ -280,7 +281,7 @@ def run():
 
     logging.info(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}")
     stim_file = pd.read_pickle(str(pkl_path))
-    sync_dataset = utils.load_sync(str(sync_path))
+    sync_dataset = Sync(sync_path)
 
     # determine if file is zarr or hdf5, and copy it to results
     result_nwb_path = output_dir / nwb_path.name
