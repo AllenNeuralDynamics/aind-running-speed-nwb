@@ -104,7 +104,7 @@ class Sync(object):
             Bit for which to return changes.
 
         """
-        bit_array = self.get_bit(bit)
+        bit_array = self.get_bit(bit).astype(np.int64)
         return np.ediff1d(bit_array, to_begin=0)
 
     def get_line_changes(self, line):
