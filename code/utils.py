@@ -5,8 +5,6 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from sync_dataset import Sync
-
 DEGREES_TO_RADIANS = np.pi / 180.0
 
 
@@ -60,7 +58,7 @@ def load_sync(path):
 
 
 def get_edges(
-    sync_dataset: Sync,
+    sync_file: h5py.File,
     kind: str,
     keys: Union[str, Sequence[str]],
     units: str = "seconds",
@@ -100,15 +98,15 @@ def get_edges(
     for line in keys:
         try:
             if kind == "falling":
-                return sync_dataset.get_falling_edges(line, units)
+                return get_falling_edges(sync_file, line, units)
             elif kind == "rising":
-                return sync_dataset.get_rising_edges(line, units)
+                return get_rising_edges(sync_file, line, units)
             elif kind == "all":
                 return np.sort(
                     np.concatenate(
                         [
-                            sync_dataset.get_falling_edges(line, units),
-                            sync_dataset.get_rising_edges(line, units),
+                            get_edges(sync_file, "rising", keys, units),
+                            get_edges(sync_file, "falling", keys, units),
                         ]
                     )
                 )
@@ -118,6 +116,22 @@ def get_edges(
     if not permissive:
         raise KeyError(f"none of {keys} were found in this dataset's line labels")
 
+
+def get_rising_edges(sync_file, line, units="samples"):
+    """
+    Returns the counter values for the rizing edges for a specific bit or
+        line.
+
+    Parameters
+    ----------
+    line : str
+        Line for which to return edges.
+
+    """
+    meta_data = get_meta_data(sync_file)
+    bit = line_to_bit(sync_file, line)
+    changes = get_bit_changes(sync_file, bit)
+    return get_all_times(sync_file, meta_data, units)[np.where(changes == 1)]
 
 
 def trim_discontiguous_times(times: np.ndarray, threshold=100) -> np.ndarray:
@@ -249,7 +263,7 @@ def get_bit_changes(sync_file, bit):
         Bit for which to return changes.
 
     """
-    bit_array = get_sync_file_bit(sync_file, bit)
+    bit_array = get_sync_file_bit(sync_file, bit).astype(np.int64)
     return np.ediff1d(bit_array, to_begin=0)
 
 
