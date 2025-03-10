@@ -263,7 +263,7 @@ def get_bit_changes(sync_file, bit):
         Bit for which to return changes.
 
     """
-    bit_array = get_sync_file_bit(sync_file, bit)
+    bit_array = get_sync_file_bit(sync_file, bit).astype(np.int64)
     return np.ediff1d(bit_array, to_begin=0)
 
 
