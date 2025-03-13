@@ -278,7 +278,7 @@ def run():
     sync_paths = list(input_dir.rglob("behavior/*.h5"))
     if len(sync_paths) == 0:
         sync_paths = list(input_dir.rglob("behavior/*.sync"))
-    sync_path = next(sync_paths)
+    sync_path = sync_paths[0]
     nwb_path = next(input_dir.rglob("*.nwb"))
 
     logging.info(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}")
