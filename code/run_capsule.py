@@ -293,7 +293,7 @@ def run():
     print("Using NWB:", nwb_path)
 
     print('INPUT BEHAVIOR DIR', input_behavior_dir)
-    assert input_behavior_dir.exists(), "Input NWB Dir does not exist"
+    assert input_behavior_dir.exists(), "Input  Dir does not exist"
     sync_paths = list(input_behavior_dir.rglob("*.h5"))
     if len(sync_paths) == 0:
         sync_paths = list(input_behavior_dir.rglob("*.sync"))
