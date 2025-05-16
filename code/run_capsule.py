@@ -21,6 +21,11 @@ DEFAULT_RUNNING_SPEED_UNITS = {
 }
 
 
+data_folder = Path("../data/")
+scratch_folder = Path("../scratch/")
+results_folder = Path("../results/")
+
+
 def extract_running_speeds(
     frame_times: np.array,
     dx_deg: np.array,
@@ -255,16 +260,22 @@ def parse_args():
         description="Package running speed data into an NWB file"
     )
     parser.add_argument(
-        "--input-dir",
+        "--input_nwb_dir",
         type=str,
-        help="Path to the folder containing the data",
-        default="../data",
+        help="Path within ../data to the folder containing the nwb file",
+        default="nwb",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output_dir",
         type=str,
-        help="Path to the folder to store results",
-        default="../results",
+        help="Path in the results folder to store results",
+        default="",
+    )
+    parser.add_argument(
+        "--input_behavior_dir",
+        type=str,
+        help="Path to the folder containing the pkl and sync files",
+        default = "session/behavior"
     )
     return parser.parse_args()
 
@@ -272,11 +283,35 @@ def parse_args():
 def run():
     """basic run function"""
     args = parse_args()
-    input_dir = Path(args.input_dir)
-    output_dir = Path(args.output_dir)
-    pkl_path = next(input_dir.rglob("behavior/*.pkl"))
-    sync_path = next(input_dir.rglob("behavior/*.h5"))
-    nwb_path = next(input_dir.rglob("*.nwb"))
+    output_dir = results_folder / args.output_dir
+    input_behavior_dir = data_folder / args.input_behavior_dir
+    input_nwb_dir = data_folder / args.input_nwb_dir
+
+    print('INPUT NWB DIR', input_nwb_dir)
+    assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
+    nwb_path = next(input_nwb_dir.rglob("*.nwb"))
+    print("Using NWB:", nwb_path)
+
+    print('INPUT BEHAVIOR DIR', input_behavior_dir)
+    assert input_behavior_dir.exists(), "Input  Dir does not exist"
+    sync_paths = list(input_behavior_dir.rglob("*.h5"))
+    if len(sync_paths) == 0:
+        sync_paths = list(input_behavior_dir.rglob("*.sync"))
+    sync_path = sync_paths[0]
+    print("Using sync:", sync_path)
+
+    stim_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.stim.pkl')]
+    behavior_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.behavior.pkl')]
+    if len(stim_pkl_files) == 0 and len(behavior_pkl_files) == 0:
+        stim_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.pkl')]
+    if len(stim_pkl_files) != 1:
+        if len(behavior_pkl_files) != 1:
+            raise Exception(f'Expected exactly one pkl file match. Found\n stim_pkl files: {stim_pkl_files}\n behavior pkl files: {behavior_pkl_files}')
+        else:
+            pkl_path = behavior_pkl_files[0]
+    else:
+        pkl_path = stim_pkl_files[0]
+    print("Using pkl:",pkl_path)
 
     logging.info(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}")
     stim_file = pd.read_pickle(str(pkl_path))
