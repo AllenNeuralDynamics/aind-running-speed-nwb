@@ -116,18 +116,18 @@ def add_running_speed_to_nwbfile(
     if units is None:
         units = DEFAULT_RUNNING_SPEED_UNITS
 
-    running_mod = pynwb.ProcessingModule("running_new", "running speed data")
+    running_mod = pynwb.ProcessingModule("running", "running speed data")
     nwbfile.add_processing_module(running_mod)
 
     running_speed_timeseries = pynwb.base.TimeSeries(
-        name="running_speed_new",
+        name="running_speed",
         timestamps=running_speed["start_time"].values,
         data=running_speed["velocity"].values,
         unit=units["velocity"],
     )
 
     rotation_timeseries = pynwb.base.TimeSeries(
-        name="running_wheel_rotation_new",
+        name="running_wheel_rotation",
         timestamps=running_speed_timeseries,
         data=running_speed["net_rotation"].values,
         unit=units["rotation"],
@@ -161,21 +161,21 @@ def add_raw_running_data_to_nwbfile(
         units = DEFAULT_RUNNING_SPEED_UNITS
 
     raw_rotation_timeseries = pynwb.base.TimeSeries(
-        name="raw_running_wheel_rotation_new",
+        name="raw_running_wheel_rotation",
         timestamps=np.array(raw_running_data["frame_time"]),
         data=raw_running_data["dx"].values,
         unit=units["rotation"],
     )
 
     vsig_ts = pynwb.base.TimeSeries(
-        name="running_wheel_signal_voltage_new",
+        name="running_wheel_signal_voltage",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vsig"].values,
         unit=units["vsig"],
     )
 
     vin_ts = pynwb.base.TimeSeries(
-        name="running_wheel_supply_voltage_new",
+        name="running_wheel_supply_voltage",
         timestamps=raw_rotation_timeseries,
         data=raw_running_data["vin"].values,
         unit=units["vin"],
