@@ -305,7 +305,9 @@ def run():
     if len(stim_pkl_files) == 0 and len(behavior_pkl_files) == 0:
         stim_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.pkl')]
     if len(stim_pkl_files) != 1:
-        if len(behavior_pkl_files) != 1:
+        if len(stim_pkl_files) == 2:
+            pkl_path = stim_pkl_files[0]
+        elif len(behavior_pkl_files) != 1:
             raise Exception(f'Expected exactly one pkl file match. Found\n stim_pkl files: {stim_pkl_files}\n behavior pkl files: {behavior_pkl_files}')
         else:
             pkl_path = behavior_pkl_files[0]
