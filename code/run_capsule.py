@@ -3,8 +3,11 @@
 import argparse
 import logging
 import shutil
+import os
+import json
 from pathlib import Path
 from typing import Union
+from datetime import datetime as dt
 
 import numpy as np
 import pandas as pd
@@ -12,6 +15,11 @@ import pynwb
 import utils
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
+from aind_nwb_utils import utils as nwb_utils 
+from aind_data_schema.core.processing import DataProcess
+from aind_data_schema.base import AindGeneric
+from aind_data_schema_models.process_names import ProcessName
+
 
 DEFAULT_RUNNING_SPEED_UNITS = {
     "velocity": "cm/s",
@@ -24,6 +32,52 @@ DEFAULT_RUNNING_SPEED_UNITS = {
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch/")
 results_folder = Path("../results/")
+
+
+def write_data_process(
+    metadata: dict,
+    h5_path: Union[str, Path],
+    nwb_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    start_time: dt,
+    end_time: dt,
+) -> None:
+    """Writes output metadata to plane processing.json
+
+    Parameters
+    ----------
+    metadata: dict
+        parameters from suite2p motion correction
+    h5_path: str
+        path to h5 
+    nwb_path: str
+        path to the nwb
+    """
+    if isinstance(h5_path, Path):
+        h5_path = str(h5_path)
+    if isinstance(nwb_path, Path):
+        nwb_path = str(nwb_path)
+    if isinstance(metadata, str):
+        metadata = json.loads(metadata)
+    data_proc = DataProcess(
+        name=ProcessName.OTHER,
+        software_version=os.getenv("VERSION", ""),
+        start_date_time=start_time.isoformat(),
+        end_date_time=end_time.isoformat(),
+        parameters = AindGeneric(**metadata),
+        input_location=str(h5_path),
+        output_location=str(nwb_path),
+
+        code_url="https://github.com/AllenNeuralDynamics/NWB-Packaging-Running-Capsule/code/",
+        code_version=os.getenv("VERSION", ""),
+        notes="Bci behavior stimulus table"
+    )
+    if isinstance(output_dir, str):
+        output_dir = Path(output_dir)
+    with open(
+        output_dir / f"running-nwb-packaging_data_process.json", "w"
+    ) as f:
+        json.dump(json.loads(data_proc.model_dump_json()), f, indent=4)
 
 
 def extract_running_speeds(
@@ -282,15 +336,20 @@ def parse_args():
 
 def run():
     """basic run function"""
+    start_time = dt.now()
     args = parse_args()
     output_dir = results_folder / args.output_dir
     input_behavior_dir = data_folder / args.input_behavior_dir
     input_nwb_dir = data_folder / args.input_nwb_dir
 
-    print('INPUT NWB DIR', input_nwb_dir)
-    assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
-    nwb_path = next(input_nwb_dir.rglob("*.nwb"))
-    print("Using NWB:", nwb_path)
+    #print('INPUT NWB DIR', input_nwb_dir)
+    # assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
+    nwb_file_obj = nwb_utils.create_base_nwb_file(input_behavior_dir.parent)
+    nwb_path = "/results/output.nwb" 
+    with NWBZarrIO(str(nwb_path), "w") as io:
+        io.write(nwb_file_obj)
+    #nwb_path = next(input_nwb_dir.rglob("*.nwb"))
+    #print("Using NWB:", nwb_path)
 
     print('INPUT BEHAVIOR DIR', input_behavior_dir)
     assert input_behavior_dir.exists(), "Input  Dir does not exist"
@@ -320,6 +379,9 @@ def run():
     sync_dataset = utils.load_sync(str(sync_path))
 
     # determine if file is zarr or hdf5, and copy it to results
+
+
+    '''
     result_nwb_path = output_dir / nwb_path.name
     if nwb_path.is_dir():
         assert (
@@ -331,14 +393,24 @@ def run():
         io_class = NWBHDF5IO
         shutil.copyfile(nwb_path, result_nwb_path)
 
+    '''
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
-
-    io = io_class(str(result_nwb_path), "r+")
+    io_class = NWBZarrIO
+    io = io_class(str(nwb_path), "r+")
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
     nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
     io.write(nwb_file)
     io.close()
+    end_time = dt.now()
+    write_data_process(
+        h5_path = sync_path,
+        nwb_path = nwb_path,
+        output_dir = "/results",
+        start_time = start_time,
+        end_time = end_time.now(),
+        metadata = {}
+    )
     logging.info("Running speed packaging completed successfully.")
 
 
