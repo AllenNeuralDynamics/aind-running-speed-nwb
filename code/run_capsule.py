@@ -426,7 +426,11 @@ def run():
         output_dir="/results",
         start_time=start_time,
         end_time=end_time.now(),
-        metadata={},
+        metadata={
+            "wheel_radius": 8.255,
+            "subject_position": 2 / 3,
+            "use_median_duration": True,
+        },
     )
     logging.info("Running speed packaging completed successfully.")
 
