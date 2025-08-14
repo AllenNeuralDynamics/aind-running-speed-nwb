@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import shutil
 import os
 import json
 from pathlib import Path
@@ -15,7 +14,7 @@ import pynwb
 import utils
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
-from aind_nwb_utils import utils as nwb_utils 
+from aind_nwb_utils import utils as nwb_utils
 from aind_data_schema.core.processing import DataProcess
 from aind_data_schema.base import AindGeneric
 from aind_data_schema_models.process_names import ProcessName
@@ -49,7 +48,7 @@ def write_data_process(
     metadata: dict
         parameters from suite2p motion correction
     h5_path: str
-        path to h5 
+        path to h5
     nwb_path: str
         path to the nwb
     """
@@ -64,18 +63,18 @@ def write_data_process(
         software_version=os.getenv("VERSION", ""),
         start_date_time=start_time.isoformat(),
         end_date_time=end_time.isoformat(),
-        parameters = AindGeneric(**metadata),
+        parameters=AindGeneric(**metadata),
         input_location=str(h5_path),
         output_location=str(nwb_path),
-
-        code_url="https://github.com/AllenNeuralDynamics/NWB-Packaging-Running-Capsule/code/",
+        code_url="https://github.com/AllenNeuralDynamics/"
+        "NWB-Packaging-Running-Capsule/code/",
         code_version=os.getenv("VERSION", ""),
-        notes="Bci behavior stimulus table"
+        notes="Bci behavior stimulus table",
     )
     if isinstance(output_dir, str):
         output_dir = Path(output_dir)
     with open(
-        output_dir / f"running-nwb-packaging_data_process.json", "w"
+        output_dir / "running-nwb-packaging_data_process.json", "w"
     ) as f:
         json.dump(json.loads(data_proc.model_dump_json()), f, indent=4)
 
@@ -122,7 +121,9 @@ def extract_running_speeds(
         angular_velocity = dx_rad / durations
 
     radius = wheel_radius * subject_position
-    linear_velocity = utils.angular_to_linear_velocity(angular_velocity, radius)
+    linear_velocity = utils.angular_to_linear_velocity(
+        angular_velocity, radius
+    )
 
     df = pd.DataFrame(
         {
@@ -133,23 +134,28 @@ def extract_running_speeds(
         }
     )
     sudden_drop = (
-        (abs(df["velocity"].shift(1)) > 0.5)  # Previous velocity is significantly non-zero
-        & np.isclose(df["velocity"], 0.0, atol=1e-3)  # Current velocity is near zero
-        & (abs(df["velocity"].shift(-1)) > 0.5)  # Following velocity is significantly non-zero
+        (
+            abs(df["velocity"].shift(1)) > 0.5
+        )  # Previous velocity is significantly non-zero
+        & np.isclose(
+            df["velocity"], 0.0, atol=1e-3
+        )  # Current velocity is near zero
+        & (
+            abs(df["velocity"].shift(-1)) > 0.5
+        )  # Following velocity is significantly non-zero
     )
 
-    # Remove rows with near-zero velocity only if they are flanked by significant non-zero values
+    # Remove rows with near-zero velocity only if
+    # they are flanked by significant non-zero values
     df = df[~sudden_drop]
-    # due to an acquisition bug (the buffer of raw orientations may be updated
-    # more slowly than it is read, leading to a 0 value for the change in
-    # orientation over an interval) there may be exact zeros in the velocity.
-    #df = df[~(np.isclose(df["net_rotation"], 0.0))]
 
     return df
 
 
 def add_running_speed_to_nwbfile(
-    nwbfile: Union[NWBZarrIO, NWBHDF5IO], running_speed: np.array, units: dict = None
+    nwbfile: Union[NWBZarrIO, NWBHDF5IO],
+    running_speed: np.array,
+    units: dict = None,
 ):
     """Add running speed data to an NWB file
 
@@ -194,7 +200,9 @@ def add_running_speed_to_nwbfile(
 
 
 def add_raw_running_data_to_nwbfile(
-    nwbfile: Union[NWBHDF5IO, NWBZarrIO], raw_running_data: dict, units: dict = None
+    nwbfile: Union[NWBHDF5IO, NWBZarrIO],
+    raw_running_data: dict,
+    units: dict = None,
 ):
     """Add raw running data to an NWB file
 
@@ -265,7 +273,10 @@ def get_running_data(
     # 3. sets the vsync line high
     # 4. flips the buffer
     frame_times = utils.get_edges(
-        sync_dataset, "rising", ("frames", "stim_vsync", "vsync_stim"), units="seconds"
+        sync_dataset,
+        "rising",
+        ("frames", "stim_vsync", "vsync_stim"),
+        units="seconds",
     )
 
     num_raw_timestamps = len(frame_times)
@@ -319,17 +330,12 @@ def parse_args():
         help="Path within ../data to the folder containing the nwb file",
         default="nwb",
     )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        help="Path in the results folder to store results",
-        default="",
-    )
+
     parser.add_argument(
         "--input_behavior_dir",
         type=str,
         help="Path to the folder containing the pkl and sync files",
-        default = "session/behavior"
+        default="session/behavior",
     )
     return parser.parse_args()
 
@@ -338,20 +344,18 @@ def run():
     """basic run function"""
     start_time = dt.now()
     args = parse_args()
-    output_dir = results_folder / args.output_dir
     input_behavior_dir = data_folder / args.input_behavior_dir
-    input_nwb_dir = data_folder / args.input_nwb_dir
 
-    #print('INPUT NWB DIR', input_nwb_dir)
+    # print('INPUT NWB DIR', input_nwb_dir)
     # assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
     nwb_file_obj = nwb_utils.create_base_nwb_file(input_behavior_dir.parent)
-    nwb_path = "/results/output.nwb" 
+    nwb_path = "/results/output.nwb"
     with NWBZarrIO(str(nwb_path), "w") as io:
         io.write(nwb_file_obj)
-    #nwb_path = next(input_nwb_dir.rglob("*.nwb"))
-    #print("Using NWB:", nwb_path)
+    # nwb_path = next(input_nwb_dir.rglob("*.nwb"))
+    # print("Using NWB:", nwb_path)
 
-    print('INPUT BEHAVIOR DIR', input_behavior_dir)
+    print("INPUT BEHAVIOR DIR", input_behavior_dir)
     assert input_behavior_dir.exists(), "Input  Dir does not exist"
     sync_paths = list(input_behavior_dir.rglob("*.h5"))
     if len(sync_paths) == 0:
@@ -359,29 +363,42 @@ def run():
     sync_path = sync_paths[0]
     print("Using sync:", sync_path)
 
-    stim_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.stim.pkl')]
-    behavior_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.behavior.pkl')]
+    stim_pkl_files = [
+        p for p in input_behavior_dir.iterdir() if p.name.endswith(".stim.pkl")
+    ]
+    behavior_pkl_files = [
+        p
+        for p in input_behavior_dir.iterdir()
+        if p.name.endswith(".behavior.pkl")
+    ]
     if len(stim_pkl_files) == 0 and len(behavior_pkl_files) == 0:
-        stim_pkl_files = [p for p in input_behavior_dir.iterdir() if p.name.endswith('.pkl')]
+        stim_pkl_files = [
+            p for p in input_behavior_dir.iterdir() if p.name.endswith(".pkl")
+        ]
     if len(stim_pkl_files) != 1:
         if len(stim_pkl_files) == 2:
             pkl_path = stim_pkl_files[0]
         elif len(behavior_pkl_files) != 1:
-            raise Exception(f'Expected exactly one pkl file match. Found\n stim_pkl files: {stim_pkl_files}\n behavior pkl files: {behavior_pkl_files}')
+            raise Exception(
+                "Expected exactly one pkl file match."
+                f"Found\n stim_pkl files: {stim_pkl_files}\n"
+                f" behavior pkl files: {behavior_pkl_files}"
+            )
         else:
             pkl_path = behavior_pkl_files[0]
     else:
         pkl_path = stim_pkl_files[0]
-    print("Using pkl:",pkl_path)
+    print("Using pkl:", pkl_path)
 
-    logging.info(f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}")
+    logging.info(
+        f"pkl file: {pkl_path},\nsync file: {sync_path},\nnwb file: {nwb_path}"
+    )
     stim_file = pd.read_pickle(str(pkl_path))
     sync_dataset = utils.load_sync(str(sync_path))
 
     # determine if file is zarr or hdf5, and copy it to results
 
-
-    '''
+    """
     result_nwb_path = output_dir / nwb_path.name
     if nwb_path.is_dir():
         assert (
@@ -393,7 +410,7 @@ def run():
         io_class = NWBHDF5IO
         shutil.copyfile(nwb_path, result_nwb_path)
 
-    '''
+    """
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
     io_class = NWBZarrIO
     io = io_class(str(nwb_path), "r+")
@@ -404,12 +421,12 @@ def run():
     io.close()
     end_time = dt.now()
     write_data_process(
-        h5_path = sync_path,
-        nwb_path = nwb_path,
-        output_dir = "/results",
-        start_time = start_time,
-        end_time = end_time.now(),
-        metadata = {}
+        h5_path=sync_path,
+        nwb_path=nwb_path,
+        output_dir="/results",
+        start_time=start_time,
+        end_time=end_time.now(),
+        metadata={},
     )
     logging.info("Running speed packaging completed successfully.")
 
