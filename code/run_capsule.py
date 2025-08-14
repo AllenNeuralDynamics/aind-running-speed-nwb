@@ -349,7 +349,8 @@ def run():
     # print('INPUT NWB DIR', input_nwb_dir)
     # assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
     nwb_file_obj = nwb_utils.create_base_nwb_file(input_behavior_dir.parent)
-    nwb_path = "/results/output.nwb"
+    nwb_name = nwb_file_obj.session_id
+    nwb_path = f"/results/{nwb_name}.nwb"
     with NWBZarrIO(str(nwb_path), "w") as io:
         io.write(nwb_file_obj)
     # nwb_path = next(input_nwb_dir.rglob("*.nwb"))
