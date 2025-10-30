@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Union
 from datetime import datetime as dt
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -325,12 +326,17 @@ def parse_args():
         description="Package running speed data into an NWB file"
     )
     parser.add_argument(
+        "--use_input_nwb",
+        type=str,
+        help="Whether or to use the NWB at --input_nwb_path or to create a new one from --input_behavior_dir",
+        default = 'False'
+    )
+    parser.add_argument(
         "--input_nwb_dir",
         type=str,
         help="Path within ../data to the folder containing the nwb file",
         default="nwb",
     )
-
     parser.add_argument(
         "--input_behavior_dir",
         type=str,
@@ -345,16 +351,34 @@ def run():
     start_time = dt.now()
     args = parse_args()
     input_behavior_dir = data_folder / args.input_behavior_dir
+    use_input_nwb = args.use_input_nwb
+    input_nwb_dir = data_folder / args.input_nwb_dir
 
-    # print('INPUT NWB DIR', input_nwb_dir)
-    # assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
-    nwb_file_obj = nwb_utils.create_base_nwb_file(input_behavior_dir.parent)
-    nwb_name = nwb_file_obj.session_id
-    nwb_path = f"/results/{nwb_name}.nwb"
-    with NWBZarrIO(str(nwb_path), "w") as io:
-        io.write(nwb_file_obj)
-    # nwb_path = next(input_nwb_dir.rglob("*.nwb"))
-    # print("Using NWB:", nwb_path)
+    if args.use_input_nwb in ('t','T','true','True'):
+        print('INPUT NWB DIR', input_nwb_dir)
+        assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
+        nwb_path = next(input_nwb_dir.rglob("*.nwb"))
+        # determine if file is zarr or hdf5, and copy it to results
+
+        result_nwb_path = results_folder / nwb_path.name
+        if nwb_path.is_dir():
+            assert (
+                nwb_path / ".zattrs"
+            ).is_file(), f"{nwb_path.name} is not a valid Zarr folder"
+            io_class = NWBZarrIO
+            shutil.copytree(nwb_path, result_nwb_path, dirs_exist_ok=True)
+        else:
+            io_class = NWBHDF5IO
+            shutil.copyfile(nwb_path, result_nwb_path)
+        nwb_path = result_nwb_path
+    else:
+        io_class = NWBZarrIO
+        nwb_file_obj = nwb_utils.create_base_nwb_file(input_behavior_dir.parent)
+        nwb_name = nwb_file_obj.session_id
+        nwb_path = f"/results/{nwb_name}.nwb"
+        with io_class(str(nwb_path), "w") as io:
+            io.write(nwb_file_obj)
+    print("Using NWB:", nwb_path)
 
     print("INPUT BEHAVIOR DIR", input_behavior_dir)
     assert input_behavior_dir.exists(), "Input  Dir does not exist"
@@ -397,23 +421,7 @@ def run():
     stim_file = pd.read_pickle(str(pkl_path))
     sync_dataset = utils.load_sync(str(sync_path))
 
-    # determine if file is zarr or hdf5, and copy it to results
-
-    """
-    result_nwb_path = output_dir / nwb_path.name
-    if nwb_path.is_dir():
-        assert (
-            nwb_path / ".zattrs"
-        ).is_file(), f"{nwb_path.name} is not a valid Zarr folder"
-        io_class = NWBZarrIO
-        shutil.copytree(nwb_path, result_nwb_path, dirs_exist_ok=True)
-    else:
-        io_class = NWBHDF5IO
-        shutil.copyfile(nwb_path, result_nwb_path)
-
-    """
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
-    io_class = NWBZarrIO
     io = io_class(str(nwb_path), "r+")
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
@@ -424,7 +432,7 @@ def run():
     write_data_process(
         h5_path=sync_path,
         nwb_path=nwb_path,
-        output_dir="/results",
+        output_dir=results_folder,
         start_time=start_time,
         end_time=end_time.now(),
         metadata={
