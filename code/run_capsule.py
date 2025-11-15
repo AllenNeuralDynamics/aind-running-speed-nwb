@@ -131,6 +131,8 @@ def extract_running_speeds(
         linear_velocity = linear_velocity[:-1]
     if len(start_times) == len(dx_rad) + 1:
         linear_velocity = dx_rad[:-1]
+    print("lengths of start times:",len(start_times),"end times",len(end_times))
+    print("velocity:",len(velocity),"rotation:",len(dx_rad))
     df = pd.DataFrame(
         {
             "start_time": start_times,
