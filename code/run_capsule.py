@@ -126,13 +126,14 @@ def extract_running_speeds(
         angular_velocity, radius
     )
 
-    # there might be one too few recorded times, for running its fine to just truncate
+    print("lengths of start times:",len(start_times),"end times",len(end_times))
+    print("velocity:",len(linear_velocity),"rotation:",len(dx_rad))
+
+    # there might be one too few recorded times, for running its fine to just truncate 
     if len(start_times) == len(linear_velocity) + 1:
         linear_velocity = linear_velocity[:-1]
     if len(start_times) == len(dx_rad) + 1:
-        linear_velocity = dx_rad[:-1]
-    print("lengths of start times:",len(start_times),"end times",len(end_times))
-    print("velocity:",len(linear_velocity),"rotation:",len(dx_rad))
+        dx_rad = dx_rad[:-1]
     df = pd.DataFrame(
         {
             "start_time": start_times,
