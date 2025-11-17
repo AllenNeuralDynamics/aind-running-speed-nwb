@@ -313,6 +313,11 @@ def get_running_data(
 
     print("array lengths\n","vsig:",len(vsig),"vin:",len(vin))
     print("frame_times",len(frame_times),"rotation:",len(dx_deg))
+    if len(vsig) == len(frame_times)+1:
+        print("one extra frame time; truncating wheel measurements by 1")
+        vsig = vsig[:-1]
+        vin = vin[:-1]
+        dx_deg = dx_deg[:-1]
 
     velocities = extract_running_speeds(
         frame_times=frame_times,
