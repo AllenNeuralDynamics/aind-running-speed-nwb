@@ -311,6 +311,9 @@ def get_running_data(
     if len(vsig) != len(dx_deg):
         vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
 
+    print("array lengths\n","vsig:",len(vsig),"vin:",len(vin))
+    print("frame_times",len(frame_times),"rotation:",len(dx_deg))
+
     velocities = extract_running_speeds(
         frame_times=frame_times,
         dx_deg=dx_deg,
@@ -318,6 +321,7 @@ def get_running_data(
         subject_position=2 / 3,
         use_median_duration=True,
     )
+
 
     raw_data = pd.DataFrame(
         {"vsig": vsig, "vin": vin, "frame_time": frame_times, "dx": dx_deg}
