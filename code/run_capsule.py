@@ -132,10 +132,10 @@ def extract_running_speeds(
     # there might be one too few recorded times, for running its fine to just truncate 
     if len(start_times) == len(linear_velocity)-1:
         linear_velocity = linear_velocity[:-1]
-        print("one extra velocity time. Truncating to {len(linear_velocity)}")
+        print(f"one extra velocity time. Truncating to {len(linear_velocity)}")
     if len(start_times) == len(dx_rad)-1:
         dx_rad = dx_rad[:-1]
-        print("one extra rotation time. Truncating to {len(dx_rad)}")
+        print(f"one extra rotation time. Truncating to {len(dx_rad)}")
     df = pd.DataFrame(
         {
             "start_time": start_times,
