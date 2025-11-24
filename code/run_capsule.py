@@ -291,6 +291,12 @@ def get_running_data(
     dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
     if len(dx_deg) > num_raw_timestamps:
         num_raw_timestamps = len(dx_deg)
+
+    if len(dx_deg)+1 == num_raw_timestamps:
+        print("There are {len(frame_times)} frame times and {len(dx_deg)} rotation times. Trimming one frame time")
+        num_raw_timestamps -= 1
+        frame_times = frame_times[:-1]
+
     if num_raw_timestamps != len(dx_deg):
         raise ValueError(
             f"found {num_raw_timestamps} rising edges on the vsync line, "
