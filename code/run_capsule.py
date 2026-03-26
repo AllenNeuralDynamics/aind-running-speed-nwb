@@ -453,12 +453,6 @@ def run():
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
     nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
 
-    print(nwb_file.processing.keys())
-    print(nwb_file.processing['running']['running_wheel_rotation'])
-    print(nwb_file.processing['running']['running_wheel_rotation'].data)
-    print(min(np.array(nwb_file.processing['running']['running_wheel_rotation'].data)))
-    print(max(np.array(nwb_file.processing['running']['running_wheel_rotation'].data)))
-    print(nwb_file.processing['running']['running_wheel_rotation'].timestamps)
     io.write(nwb_file)
     io.close()
     end_time = dt.now()
