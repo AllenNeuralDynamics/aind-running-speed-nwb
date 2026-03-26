@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Union
 from datetime import datetime as dt
 import shutil
+from itertools import chain
 
 import numpy as np
 import pandas as pd
@@ -312,6 +313,8 @@ def get_running_data(
 
     print("array lengths\n","vsig:",len(vsig),"vin:",len(vin))
     print("frame_times",len(frame_times),"rotation:",len(dx_deg))
+    print("min/max rotation:",min(dx_deg),max(dx_deg))
+    print("min/max times:",min(frame_times),max(frame_times))
     if len(vsig) == len(frame_times)+1:
         print("one extra frame time; truncating wheel measurements by 1")
         vsig = vsig[:-1]
@@ -375,8 +378,10 @@ def run():
     if args.use_input_nwb in ('t','T','true','True'):
         print('INPUT NWB DIR', input_nwb_dir)
         assert input_nwb_dir.exists(), "Input NWB Dir does not exist"
-        nwb_path = next(input_nwb_dir.rglob("*.nwb"))
-        # determine if file is zarr or hdf5, and copy it to results
+        nwb_path = next(chain(
+            input_nwb_dir.rglob("*.nwb"),
+            input_nwb_dir.rglob("*.nwb.zarr")
+        ))        # determine if file is zarr or hdf5, and copy it to results
 
         result_nwb_path = results_folder / nwb_path.name
         if nwb_path.is_dir():
@@ -444,6 +449,13 @@ def run():
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
     nwb_file = add_raw_running_data_to_nwbfile(nwb_file, raw_data)
+
+    print(nwb_file.processing.keys())
+    print(nwb_file.processing['running']['running_wheel_rotation'])
+    print(nwb_file.processing['running']['running_wheel_rotation'].data)
+    print(min(np.array(nwb_file.processing['running']['running_wheel_rotation'].data)))
+    print(max(np.array(nwb_file.processing['running']['running_wheel_rotation'].data)))
+    print(nwb_file.processing['running']['running_wheel_rotation'].timestamps)
     io.write(nwb_file)
     io.close()
     end_time = dt.now()

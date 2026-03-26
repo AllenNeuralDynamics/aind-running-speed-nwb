@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 import h5py
 import numpy as np
 import pandas as pd
+import re
 
 DEGREES_TO_RADIANS = np.pi / 180.0
 
@@ -18,7 +19,13 @@ def check_encoder(parent, key):
     return True
 
 
+
 def running_from_stim_file(stim_file, key, expected_length):
+    if 'bonsai' in stim_file:
+        radius = stim_file['config']['DigitalEncoder']['radius_cm']
+        encoder_dict = _reconstruct_encoder_from_logger(stim_file['bonsai']['logger'], radius=radius)
+        return encoder_dict[key]
+
     if "behavior" in stim_file["items"] and check_encoder(
         stim_file["items"]["behavior"], key
     ):
@@ -323,3 +330,162 @@ def get_sample_freq(meta_data):
         return float(meta_data["ni_daq"]["sample_freq"])
     except KeyError:
         return float(meta_data["ni_daq"]["counter_output_freq"])
+
+
+def _reconstruct_encoder_from_logger(logger_rows, total_frames=None, radius=None):
+    """Reconstruct CAMSTIM-style encoder data from Bonsai logger rows.
+
+    Wheel event format example Value field:
+        'Wheel-Index-42793322-Count-4785-Deg-210.2783203125'
+
+    We parse per-frame events, derive per-frame dtheta (dx) using logic similar
+    to DigitalBehaviorEncoder, propagate last values for frames without events,
+    and compute derived vsig and optional distance.
+    """
+    wheel_pattern = re.compile(
+        r'^Wheel-Index-(\d+)-Count-(-?\d+)-Deg-([-\d\.eE]+)$'
+    )   
+    start_time_pattern = re.compile(r'^START$')
+    end_time_pattern = re.compile(r'^END$')
+
+    events_by_frame = {}
+    max_frame = 0
+    global_ref_timestamps = 0 
+
+    for row in logger_rows:
+        try:
+            frame = int(row.get('Frame', '0'))
+            if frame > max_frame:
+                max_frame = frame
+            val = row.get('Value', '')
+            m = wheel_pattern.match(val)
+            if m:
+                idx = int(m.group(1))
+                count = int(m.group(2))
+                deg = float(m.group(3))
+                events_by_frame[frame] = {'index': idx, 'count': count, 'deg': deg}
+            elif start_time_pattern.match(val):
+                # We save the start frame to align timestamps later 
+                global_ref_timestamps = float(row.get('Timestamp'))
+                print("Found START marker at frame %d for encoder reconstruction, timestamp %s" % (frame, global_ref_timestamps))
+            elif end_time_pattern.match(val):
+                print("Found END marker at frame %d for encoder reconstruction" % frame) 
+                end_session = float(row.get('Timestamp'))
+
+        except Exception:
+            print("Error parsing logger row for encoder reconstruction: %s" % row)
+            continue
+
+    # Determine number of frames to allocate
+    n_frames = int(max_frame) + 1
+    if total_frames and total_frames > n_frames:
+        n_frames = int(total_frames)
+
+    dx = np.zeros(n_frames, dtype=np.float32)
+    degrees = np.zeros(n_frames, dtype=np.float64)
+    counts = np.zeros(n_frames, dtype=np.float32)
+    timestamps = np.zeros(n_frames, dtype=np.float32)
+
+    last_deg = None
+    last_index = None
+    last_dtheta = 0.0
+
+    # For timestamps, build map first
+    frame_time = {}
+    for row in logger_rows:
+        try:
+            f = int(row.get('Frame', '0'))
+            if f not in frame_time:
+                frame_time[f] = float(row.get('Timestamp', '0'))
+        except Exception:
+            pass
+
+    in_evt_count = 0
+    not_evt_count = 0
+
+    print("n frames!",n_frames)
+    for f in range(n_frames):
+        evt = events_by_frame.get(f)
+        if evt:
+            in_evt_count += 1
+            idx = evt['index']
+            deg = evt['deg']
+            if last_deg is None or last_index is None:
+                dtheta = 0.0
+            else:
+                if idx == last_index:
+                    dtheta = last_dtheta  # reuse
+                else:
+                    try:
+                        dtheta = (deg - last_deg) / (idx - last_index)
+                    except ZeroDivisionError:
+                        dtheta = 0.0
+            last_dtheta = dtheta
+            last_deg = deg
+            last_index = idx
+            degrees[f] = deg
+            dx[f] = dtheta
+            counts[f] = evt['count']
+        else:
+            not_evt_count += 1
+            # propagate degree by integrating last_dtheta
+            if f > 0:
+                degrees[f] = degrees[f-1] + last_dtheta
+                counts[f] = counts[f-1]
+            else:
+                degrees[f] = 0.0
+                counts[f] = 0.0
+            dx[f] = last_dtheta
+        # previous frame timestamp or we substract the last known deltatime
+        timestamps[f] = frame_time.get(f, timestamps[f-1] if f > 0 else timestamps[f]-0.016)
+
+    # If some degrees slots remain zero but we had last_deg set, retroactively fill preceding frames
+    # (Not strictly necessary; we already integrate above.)
+
+    # Compute vsig & vin
+    vsig = (degrees % 360.0) * (5.0 / 360.0)
+    vin = np.full(n_frames, 5.0, dtype=np.float32)
+
+    # Distance if radius available
+    # radius = self.config.get('digital_encoder', {}).get('radius_cm') \
+    #     or self.config.get('encoder', {}).get('radius_cm')
+    if radius is not None:
+        try:
+            radius = float(radius)
+            distance = dx * (np.pi/180.0) * radius
+        except Exception:
+            distance = None
+    else:
+        distance = None
+
+    # We restrict the arrays between global_ref_timestamps and end_session if available
+    if global_ref_timestamps and end_session:
+        timestamps_float = timestamps.astype(np.float64, copy=False)
+        kept_frames = ((timestamps_float >= float(global_ref_timestamps)) &
+                        (timestamps_float <= float(end_session)))
+        n_kept = np.sum(kept_frames)
+        print("Trimming encoder arrays from %d to %d frames based on START/END timestamps" % (n_frames, n_kept))
+        dx = dx[kept_frames]
+        degrees = degrees[kept_frames]
+        vin = vin[kept_frames]
+        vsig = vsig[kept_frames]
+        counts = counts[kept_frames]
+        timestamps = timestamps[kept_frames]
+        distance = distance[kept_frames] if distance is not None else None
+
+    encoder_dict = {
+        'dx': dx.astype(np.float32),
+        'gain': 1.0,
+        'items': {},
+        'unpickleable': [],
+        'value': float(degrees[-1]) if len(degrees) else 0.0,
+        'vin': vin,
+        'vsig': vsig.astype(np.float32),
+        'analog_encoder': False,
+        'counts': counts.astype(np.float32),
+        'timestamp': timestamps.astype(np.float32)-global_ref_timestamps
+    }
+    if distance is not None:
+        encoder_dict['distance'] = distance.astype(np.float32)
+
+    return encoder_dict
