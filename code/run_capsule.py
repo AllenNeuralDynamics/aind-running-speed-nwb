@@ -290,6 +290,9 @@ def get_running_data(
     logging.info(len(trimmed_times))
 
     dx_deg = utils.running_from_stim_file(stim_file, "dx", num_raw_timestamps)
+
+    print('Input lengths of dx_deg:',len(dx_deg),'and frame_times',len(frame_times))
+
     if len(dx_deg) > num_raw_timestamps:
         num_raw_timestamps = len(dx_deg)
 
@@ -311,15 +314,15 @@ def get_running_data(
     if len(vsig) != len(dx_deg):
         vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
 
-    print("array lengths\n","vsig:",len(vsig),"vin:",len(vin))
-    print("frame_times",len(frame_times),"rotation:",len(dx_deg))
-    print("min/max rotation:",min(dx_deg),max(dx_deg))
-    print("min/max times:",min(frame_times),max(frame_times))
+    assert len(frame_times) > 0 and any(frame_times), "No real values for frame times"
+    assert len(dx_deg) > 0 and any(dx_deg), "No real values for rotation samples"
     if len(vsig) == len(frame_times)+1:
         print("one extra frame time; truncating wheel measurements by 1")
         vsig = vsig[:-1]
         vin = vin[:-1]
         dx_deg = dx_deg[:-1]
+
+    print('Final lengths of dx_deg:',len(dx_deg),'and frame_times',len(frame_times))
 
     velocities = extract_running_speeds(
         frame_times=frame_times,
