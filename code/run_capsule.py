@@ -296,10 +296,12 @@ def get_running_data(
     if len(dx_deg) > num_raw_timestamps:
         num_raw_timestamps = len(dx_deg)
 
-    if len(dx_deg)+1 == num_raw_timestamps:
-        print("There are {len(frame_times)} frame times and {len(dx_deg)} rotation times. Trimming one frame time")
-        num_raw_timestamps -= 1
-        frame_times = frame_times[:-1]
+    for i in range(3):
+        if len(dx_deg)+i == num_raw_timestamps:
+            print(f"There are {len(frame_times)} frame times and {len(dx_deg)} rotation times. Trimming {i} frame time(s)")
+            num_raw_timestamps -= i
+            frame_times = frame_times[:-i]
+            break
 
     if num_raw_timestamps != len(dx_deg):
         raise ValueError(
