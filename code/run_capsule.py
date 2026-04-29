@@ -20,6 +20,7 @@ from aind_nwb_utils import utils as nwb_utils
 from aind_data_schema.core.processing import DataProcess
 from aind_data_schema.base import AindGeneric
 from aind_data_schema_models.process_names import ProcessName
+import matplotlib.pyplot as plt
 
 
 DEFAULT_RUNNING_SPEED_UNITS = {
@@ -372,6 +373,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def plot_running(result_nwb_path, io_class):
+    nwb_path = "/root/capsule/results/multiplane-ophys_837568_2026-03-06_13-39-00.nwb"
+
+    io = io_class(result_nwb_path,mode='r')
+    nwb = io.read()
+    running = nwb.processing['running']['running_speed']
+    r_data = np.array(running.data)
+    r_timestamps = np.array(running.timestamps)
+    plt.plot(r_timestamps,r_data)
+    plt.savefig('/root/capsule/results/running.png')
+
+
 def run():
     """basic run function"""
     start_time = dt.now()
@@ -470,6 +483,7 @@ def run():
             "use_median_duration": True,
         },
     )
+    plot_running(nwb_path, io_class)
     logging.info("Running speed packaging completed successfully.")
 
 
