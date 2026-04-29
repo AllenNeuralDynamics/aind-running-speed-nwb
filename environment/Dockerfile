@@ -1,4 +1,4 @@
-# hash:sha256:804fabde06f9d248709e917717cc1d9b0c3acf592f8264cfc7ab55f1acb51dc9
+# hash:sha256:88257e58d1c14246072ef2fa0323a6811faa3e46f668e11b8aa5c12f7e1526d9
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
@@ -13,6 +13,7 @@ RUN pip install -U --no-cache-dir \
     aind-nwb-utils==0.1.0 \
     h5py==3.11.0 \
     hdmf-zarr==0.12.0 \
+    matplotlib \
     pandas==2.2.2 \
     pynwb==2.8.3 \
     scipy==1.13.1
