@@ -1,4 +1,4 @@
-# hash:sha256:88257e58d1c14246072ef2fa0323a6811faa3e46f668e11b8aa5c12f7e1526d9
+# hash:sha256:0e89b72904321bc8969913348b919de11ec7e7408f4c895d20b83abd6a8b433c
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
@@ -13,9 +13,9 @@ RUN pip install -U --no-cache-dir \
     aind-nwb-utils==0.1.0 \
     h5py==3.11.0 \
     hdmf-zarr==0.12.0 \
-    matplotlib \
+    matplotlib==3.10.9 \
     pandas==2.2.2 \
-    pynwb==2.8.3 \
+    pynwb==3.1.3 \
     scipy==1.13.1
 
 ADD "https://github.com/coder/code-server/releases/download/v4.100.3/code-server-4.100.3-linux-amd64.tar.gz" /.code-server/code-server.tar.gz
