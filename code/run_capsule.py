@@ -318,7 +318,10 @@ def get_running_data(
         vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
 
     assert len(frame_times) > 0 and any(frame_times), "No real values for frame times"
-    assert len(dx_deg) > 0 and any(dx_deg), "No real values for rotation samples"
+    if len(dx_deg) == 0 or not any(dx_deg):
+        print("No real values for rotation samples, not packaging running")
+        return None, None
+
     if len(vsig) == len(frame_times)+1:
         print("one extra frame time; truncating wheel measurements by 1")
         vsig = vsig[:-1]
@@ -370,6 +373,12 @@ def parse_args():
         help="Path to the folder containing the pkl and sync files",
         default="session/behavior",
     )
+    parser.add_argument(
+        "--allow_skip",
+        type=str,
+        help="Whether or not to skip running speed packaging if no good data is found",
+        default="False"
+    )
     return parser.parse_args()
 
 
@@ -392,6 +401,8 @@ def run():
     input_behavior_dir = data_folder / args.input_behavior_dir
     use_input_nwb = args.use_input_nwb
     input_nwb_dir = data_folder / args.input_nwb_dir
+    allow_skip = True if args.allow_skip in ('t','T','true','True') else False
+    print("allow skip?",allow_skip)
 
     if args.use_input_nwb in ('t','T','true','True'):
         print('INPUT NWB DIR', input_nwb_dir)
@@ -463,6 +474,13 @@ def run():
     sync_dataset = utils.load_sync(str(sync_path))
 
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
+    if (velocities, raw_data) == (None, None):
+        if allow_skip:
+            print("No non-zero running data found, skipping packaging")
+            return
+        else:
+            raise ValueError('No non-zero running data found')
+
     io = io_class(str(nwb_path), "r+")
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
