@@ -257,7 +257,9 @@ def add_raw_running_data_to_nwbfile(
 
 
 def get_running_data(
-    stim_file: Union[Path, str], sync_dataset: pd.DataFrame
+    stim_file: Union[Path, str],
+    sync_dataset: pd.DataFrame,
+    allow_skip: bool = False,
 ) -> pd.DataFrame:
     """Get running data from a stimulus file and sync dataset
 
@@ -294,6 +296,12 @@ def get_running_data(
 
     print('Input lengths of dx_deg:',len(dx_deg),'and frame_times',len(frame_times))
 
+    if allow_skip and not np.any(np.nan_to_num(dx_deg, nan=0.0)):
+        logging.info(
+            "No non-zero running data found; leaving the output NWB unmodified."
+        )
+        return None, None
+
     if len(dx_deg) > num_raw_timestamps:
         num_raw_timestamps = len(dx_deg)
 
@@ -318,7 +326,10 @@ def get_running_data(
         vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
 
     assert len(frame_times) > 0 and any(frame_times), "No real values for frame times"
-    assert len(dx_deg) > 0 and any(dx_deg), "No real values for rotation samples"
+    if len(dx_deg) == 0 or not any(dx_deg):
+        print("No real values for rotation samples, not packaging running")
+        return None, None
+
     if len(vsig) == len(frame_times)+1:
         print("one extra frame time; truncating wheel measurements by 1")
         vsig = vsig[:-1]
@@ -370,19 +381,23 @@ def parse_args():
         help="Path to the folder containing the pkl and sync files",
         default="session/behavior",
     )
+    parser.add_argument(
+        "--allow_skip",
+        type=str,
+        help="Allow missing or all-zero running data to be skipped",
+        default="False",
+    )
     return parser.parse_args()
 
 
 def plot_running(result_nwb_path, io_class):
-    nwb_path = "/root/capsule/results/multiplane-ophys_837568_2026-03-06_13-39-00.nwb"
-
     io = io_class(result_nwb_path,mode='r')
     nwb = io.read()
     running = nwb.processing['running']['running_speed']
     r_data = np.array(running.data)
     r_timestamps = np.array(running.timestamps)
     plt.plot(r_timestamps,r_data)
-    plt.savefig('/root/capsule/results/running.png')
+    plt.savefig(Path(result_nwb_path).parent / "running.png")
 
 
 def run():
@@ -392,6 +407,7 @@ def run():
     input_behavior_dir = data_folder / args.input_behavior_dir
     use_input_nwb = args.use_input_nwb
     input_nwb_dir = data_folder / args.input_nwb_dir
+    allow_skip = args.allow_skip.lower() in ('t','true')
 
     if args.use_input_nwb in ('t','T','true','True'):
         print('INPUT NWB DIR', input_nwb_dir)
@@ -462,7 +478,13 @@ def run():
     stim_file = pd.read_pickle(str(pkl_path))
     sync_dataset = utils.load_sync(str(sync_path))
 
-    velocities, raw_data = get_running_data(stim_file, sync_dataset)
+    velocities, raw_data = get_running_data(
+        stim_file, sync_dataset, allow_skip=allow_skip
+    )
+    if velocities is None:
+        logging.info("Running speed packaging skipped successfully.")
+        return
+
     io = io_class(str(nwb_path), "r+")
     nwb_file = io.read()
     nwb_file = add_running_speed_to_nwbfile(nwb_file, velocities)
