@@ -482,6 +482,17 @@ def run():
         stim_file, sync_dataset, allow_skip=allow_skip
     )
     if velocities is None:
+        write_data_process(
+            h5_path=sync_path,
+            nwb_path=nwb_path,
+            output_dir=results_folder,
+            start_time=start_time,
+            end_time=dt.now(),
+            metadata={
+                "packaging_skipped": True,
+                "skip_reason": "No non-zero running data found",
+            },
+        )
         logging.info("Running speed packaging skipped successfully.")
         return
 
