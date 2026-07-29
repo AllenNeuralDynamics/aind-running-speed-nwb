@@ -326,7 +326,10 @@ def get_running_data(
         vsig = np.concatenate((vsig, np.zeros((len(dx_deg) - len(vsig)))))
 
     assert len(frame_times) > 0 and any(frame_times), "No real values for frame times"
-    assert len(dx_deg) > 0 and any(dx_deg), "No real values for rotation samples"
+    if len(dx_deg) == 0 or not any(dx_deg):
+        print("No real values for rotation samples, not packaging running")
+        return None, None
+
     if len(vsig) == len(frame_times)+1:
         print("one extra frame time; truncating wheel measurements by 1")
         vsig = vsig[:-1]
@@ -388,15 +391,13 @@ def parse_args():
 
 
 def plot_running(result_nwb_path, io_class):
-    nwb_path = "/root/capsule/results/multiplane-ophys_837568_2026-03-06_13-39-00.nwb"
-
     io = io_class(result_nwb_path,mode='r')
     nwb = io.read()
     running = nwb.processing['running']['running_speed']
     r_data = np.array(running.data)
     r_timestamps = np.array(running.timestamps)
     plt.plot(r_timestamps,r_data)
-    plt.savefig('/root/capsule/results/running.png')
+    plt.savefig(Path(result_nwb_path).parent / "running.png")
 
 
 def run():
