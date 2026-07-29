@@ -383,15 +383,13 @@ def parse_args():
 
 
 def plot_running(result_nwb_path, io_class):
-    nwb_path = "/root/capsule/results/multiplane-ophys_837568_2026-03-06_13-39-00.nwb"
-
     io = io_class(result_nwb_path,mode='r')
     nwb = io.read()
     running = nwb.processing['running']['running_speed']
     r_data = np.array(running.data)
     r_timestamps = np.array(running.timestamps)
     plt.plot(r_timestamps,r_data)
-    plt.savefig('/root/capsule/results/running.png')
+    plt.savefig(Path(result_nwb_path).parent / "running.png")
 
 
 def run():
@@ -474,7 +472,7 @@ def run():
     sync_dataset = utils.load_sync(str(sync_path))
 
     velocities, raw_data = get_running_data(stim_file, sync_dataset)
-    if (velocities, raw_data) == (None, None):
+    if velocities is None and raw_data is None:
         if allow_skip:
             print("No non-zero running data found, skipping packaging")
             return
